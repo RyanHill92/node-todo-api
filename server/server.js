@@ -20,7 +20,7 @@ app.post('/todos', (req, res) => {
 //This will log the parsed JSON data from the client, thanks to bodyParser.
   let toDo = new ToDo({text: req.body.text});
   toDo.save().then((doc)=>{
-    res.send(`Note saved: ${doc}`);
+    res.send(doc);
   }, (err)=>{
   //400 signifies a Bad Request.
     res.status(400).send(err);
@@ -30,3 +30,5 @@ app.post('/todos', (req, res) => {
 app.listen(3000, () => {
   console.log('Server started on Port 3000.');
 });
+
+module.exports = {app};
