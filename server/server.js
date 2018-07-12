@@ -27,6 +27,15 @@ app.post('/todos', (req, res) => {
   });
 });
 
+app.get('/todos', (req, res) => {
+  ToDo.find().then((todos)=>{
+    //Wrap the array of objects in an object for future flexibility.
+    res.send({msg: 'Notes successfully retrieved', todos});
+  }, (err)=> {
+    res.status(400).send(err);
+  });
+});
+
 app.listen(3000, () => {
   console.log('Server started on Port 3000.');
 });
