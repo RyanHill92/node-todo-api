@@ -1,5 +1,6 @@
 const express = require('express');
 const bodyParser = require('body-parser');
+const {ObjectId} = require('mongodb');
 
 //Loading in mongoose here is all we need to do.
 //The reason .save() works on line 22.
@@ -33,6 +34,23 @@ app.get('/todos', (req, res) => {
     res.send({msg: 'Notes successfully retrieved', todos});
   }, (err)=> {
     res.status(400).send(err);
+  });
+});
+
+//URL params! String together multiple params with &.
+// app.get('/todos/:fruit&:friend', (req, res) => {
+//   res.send(req.params);
+// });
+
+//Some cool experimentation here with ternary op. It works!
+app.get('/todos/:id', (req, res) => {
+  let id = req.params.id;
+  !ObjectId.isValid(id) ? res.status(400).send('Invalid ID.') :
+  ToDo.findById(id).then((todo) => {
+    !todo ? res.status(404).send('Unable to find todo by that ID.') :
+    res.send({message: 'Todo located', todo});
+  }).catch((err)=> {
+    res.status(404).send(err);
   });
 });
 
