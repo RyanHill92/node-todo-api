@@ -6,12 +6,27 @@ const {app} = require('./../server');
 const {ToDo} = require('./../models/todo');
 //Mocha and nodemon don't need to be required.
 
+//Our dummy array.
+const todos = [
+  {
+    text: 'Check one'
+  }, {
+    text: 'Check two'
+  }
+];
+
 beforeEach((done) => {
   //This 'lifecycle' method will run before each test case.
   //We clear the database before each test to ensure length = 1.
   //Passing an empty object will remove all todos.
   //Runs before EACH it().
-  ToDo.remove({}).then(() => done());
+  //Inserting a dummy array of notes each time ensures the GET test will work.
+  ToDo.remove({}).then(() => {
+    //Return so we can chain a then.
+    return ToDo.insertMany(todos);
+  }).then(() => {
+    done();
+  });
 });
 
 describe('POST /todos', () => {
@@ -37,7 +52,7 @@ describe('POST /todos', () => {
         //This is Mongoose syntax, rather than native Mongo.
         //Because models ARE collections,
         //ToDo points to the same place as db.collections('Todos').
-        ToDo.find().then((todos) => {
+        ToDo.find({text}).then((todos) => {
           expect(todos.length).toBe(1);
           expect(todos[0].text).toBe(text);
           done();
@@ -56,9 +71,26 @@ describe('POST /todos', () => {
       .end((err, res) => {
         if (err) return done(err);
         ToDo.find().then((todos) => {
-          expect(todos.length).toBe(0);
+          //The length of the dummy array.
+          expect(todos.length).toBe(2);
           done();
         }).catch((err) => done(err));
       });
+  });
+});
+
+describe('GET /todos', () => {
+  it('should return an object of all todos', (done) => {
+    request(app)
+      .get('/todos')
+      .expect(200)
+      .expect((res) => {
+        //These weren't working until I downgraded expect to v. 1.20.2 from v.21...
+        expect(res.body.todos.length).toBe(2);
+        expect(res.body.msg).toBe('Notes successfully retrieved');
+        expect(res.body.todos[0]).toInclude({text: 'Check one'});
+        expect(res.body.todos).toBeA('array');
+      })
+      .end(done);
   });
 });
