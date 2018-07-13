@@ -10,7 +10,7 @@ const {ToDo} = require('./models/todo');
 
 //This file will only be used to configure routes.
 const app = express();
-
+const port = process.env.PORT || 3000;
 //Setting up third-party middleware.
 //We are "giving" this functionality to express.
 app.use(bodyParser.json());
@@ -45,17 +45,17 @@ app.get('/todos', (req, res) => {
 //Some cool experimentation here with ternary op. It works!
 app.get('/todos/:id', (req, res) => {
   let id = req.params.id;
-  !ObjectId.isValid(id) ? res.status(400).send('Invalid ID.') :
+  !ObjectId.isValid(id) ? res.status(400).send({errorMessage: 'Invalid ID.'}) :
   ToDo.findById(id).then((todo) => {
-    !todo ? res.status(404).send('Unable to find todo by that ID.') :
+    !todo ? res.status(404).send({errorMessage: 'Unable to find todo by that ID.'}) :
     res.send({message: 'Todo located', todo});
   }).catch((err)=> {
     res.status(404).send(err);
   });
 });
 
-app.listen(3000, () => {
-  console.log('Server started on Port 3000.');
+app.listen(port, () => {
+  console.log('Server started on ${port}.');
 });
 
 module.exports = {app};

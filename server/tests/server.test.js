@@ -1,5 +1,6 @@
 const expect = require('expect');
 const request = require('supertest');
+const {ObjectId} = require('mongodb');
 
 //.. means "back one folder in the directory."
 const {app} = require('./../server');
@@ -7,10 +8,13 @@ const {ToDo} = require('./../models/todo');
 //Mocha and nodemon don't need to be required.
 
 //Our dummy array.
+//Add ObjectIDs for GET /todos/:id req test to work.
 const todos = [
   {
+    _id: new ObjectId(),
     text: 'Check one'
   }, {
+    _id: new ObjectId(),
     text: 'Check two'
   }
 ];
@@ -90,6 +94,42 @@ describe('GET /todos', () => {
         expect(res.body.msg).toBe('Notes successfully retrieved');
         expect(res.body.todos[0]).toInclude({text: 'Check one'});
         expect(res.body.todos).toBeA('array');
+      })
+      .end(done);
+  });
+});
+
+describe('GET /todos/:id', () => {
+  it('should return an object in case of valid, matching ID', (done) => {
+    //So the ID is converted to a string, appendable to the URL.
+    let id = todos[0]._id.toHexString();
+    request(app)
+    //I kept getting an error because I left the : in there. Stupid!
+      .get(`/todos/${id}`)
+      .expect(200)
+      .expect((res) => {
+        expect(res.body.todo._id).toBe(id)
+        expect(res.body.message).toBe('Todo located')
+      })
+      .end(done);
+  });
+
+  it('should return a 400 in case of invalid ID format', (done) => {
+    request(app)
+      .get('/todos/123')
+      .expect(400)
+      .expect((res) => {
+        expect(res.body.errorMessage).toBe('Invalid ID.');
+      })
+      .end(done);
+  });
+
+  it('should return a 404 in case of valid ID with no matching todo', (done) => {
+    request(app)
+      .get(`/todos/${new ObjectId().toHexString()}`)
+      .expect(404)
+      .expect((res) => {
+        expect(res.body.errorMessage).toBe('Unable to find todo by that ID.');
       })
       .end(done);
   });
