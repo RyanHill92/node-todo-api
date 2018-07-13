@@ -76,7 +76,7 @@ app.patch('/todos/:id', (req, res) => {
   //Instead of using lodash, just for fun.
   function updateSpecs (req) {
     let body = {};
-    if (typeof req.body.text === 'string') {
+    if (typeof req.body.text === 'string' && req.body.text.trim().length >= 1) {
       body.text = req.body.text;
     }
     //Completed prop only set if true or false.
@@ -92,7 +92,7 @@ app.patch('/todos/:id', (req, res) => {
 
   let body = updateSpecs(req);
 
-  if (Object.keys(body).length === 0) {
+  if (Object.keys(body).length < 1) {
     return res.status(400).send({errorMessage: 'Please specify text update (string) and/or valid completion status (boolean).'});
   }
 

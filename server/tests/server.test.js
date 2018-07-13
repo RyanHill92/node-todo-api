@@ -15,7 +15,8 @@ const todos = [
     text: 'Check one'
   }, {
     _id: new ObjectId(),
-    text: 'Check two'
+    text: 'Check two',
+    completed: true
   }
 ];
 
@@ -212,4 +213,127 @@ describe('DELETE /todos/:id', () => {
         });
       });
   });
-})
+});
+
+describe('PATCH /todos/:id', () => {
+  it('should update text and set timestamp when completed', (done) => {
+    let id = todos[0]._id.toHexString();
+    let text = 'Check one, son';
+    request(app)
+      .patch(`/todos/${id}`)
+      .send({
+        text,
+        completed: true
+      })
+      .expect(200)
+      .expect((res) => {
+        expect(res.body.message).toBe('Updated todo');
+      })
+      .end((err, res) => {
+        if (err) return done(err);
+        ToDo.findById(id).then((doc) => {
+          expect(doc.text).toBe(text);
+          expect(doc.completedAt).toBeA('number');
+          expect(doc.completed).toBe(true);
+          done();
+        }).catch((err)=>{
+          done(err);
+        });
+      });
+  });
+
+  it('should update text and set completedAt to null if completed is false', (done) => {
+    let id = todos[1]._id.toHexString();
+    let text = 'Check two, foo';
+    request(app)
+      .patch(`/todos/${id}`)
+      .send({
+        text,
+        completed: false
+      })
+      .expect(200)
+      .expect((res) => {
+        expect(res.body.message).toBe('Updated todo');
+      })
+      .end((err, res) => {
+        if (err) return done(err);
+        ToDo.findById(id).then((doc) => {
+          expect(doc.text).toBe(text);
+          expect(doc.completed).toBe(false);
+          expect(doc.completedAt).toNotExist();
+          done();
+        }).catch((err) => {
+          done(err);
+        });
+      });
+  });
+
+  it('should reject a request body either blank or containing invalid data even in case of valid, matching ID', (done) => {
+    let id = todos[0]._id.toHexString();
+    //This wasn't working for 20min...because I had app(request). Stoo. Pid.
+    request(app)
+      .patch(`/todos/${id}`)
+      .send({
+        text: '   ',
+        completed: 'Yes'
+      })
+      .expect(400)
+      .expect((res) => {
+        expect(res.body.errorMessage).toBe('Please specify text update (string) and/or valid completion status (boolean).');
+      })
+      .end((err, res) => {
+        if (err) return done(err);
+        ToDo.find().then((docs) => {
+          expect(docs.length).toBe(2);
+          done();
+        }).catch((err) => {
+          done(err);
+        });
+      });
+  });
+
+  it('should send a 400 for an invalid ID', (done) => {
+    request(app)
+      .patch('/todos/123')
+      .send({
+        text: 'Test',
+        completed: false
+      })
+      .expect(400)
+      .expect((res) => {
+        expect(res.body.errorMessage).toBe('Invalid ID.')
+      })
+      .end((err, res) => {
+        if (err) return done(err);
+        ToDo.find().then((docs) => {
+          expect(docs.length).toBe(2);
+          done();
+        }).catch((err) => {
+          done(err);
+        });
+      });
+  });
+
+  it('should send a 404 for a valid, unmatching ID', (done) => {
+    let id = new ObjectId().toHexString();
+    request(app)
+      .patch(`/todos/${id}`)
+      .send({
+        text: 'Hi there',
+        completed: false
+      })
+      .expect(404)
+      .expect((res) => {
+        expect(res.body.errorMessage).toBe('Unable to find and update note.');
+      })
+      .end((err, res) => {
+        if (err) return done(err);
+        ToDo.find().then((docs) => {
+          expect(todos.length).toBe(2);
+          done();
+        }).catch((err) => {
+          done(err);
+        });
+      });
+  });
+});
