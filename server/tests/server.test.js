@@ -16,7 +16,8 @@ const todos = [
   }, {
     _id: new ObjectId(),
     text: 'Check two',
-    completed: true
+    completed: true,
+    completedAt: new Date().getTime()
   }
 ];
 
