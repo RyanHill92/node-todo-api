@@ -66,6 +66,49 @@ app.delete('/todos/:id', (req, res) => {
   });
 });
 
+app.patch('/todos/:id', (req, res) => {
+  let id = req.params.id;
+
+  if (!ObjectId.isValid(id)) {
+    //Above in ternary op, return is implied with each case of res.send().
+    return res.status(400).send({errorMessage: 'Invalid ID.'});
+  }
+  //Instead of using lodash, just for fun.
+  function updateSpecs (req) {
+    let body = {};
+    if (typeof req.body.text === 'string') {
+      body.text = req.body.text;
+    }
+    //Completed prop only set if true or false.
+    if (req.body.completed === true) {
+      body.completed = true;
+      body.completedAt = new Date().getTime();
+    } else if (req.body.completed === false) {
+      body.completed = false;
+      body.completedAt = null;
+    }
+    return body;
+  }
+
+  let body = updateSpecs(req);
+
+  if (Object.keys(body).length === 0) {
+    return res.status(400).send({errorMessage: 'Please specify text update (string) and/or valid completion status (boolean).'});
+  }
+
+  ToDo.findByIdAndUpdate(id, {
+    //Should work since body is an obj.
+    $set: body
+  }, {
+    new: true
+  }).then((todo) => {
+    !todo ? res.status(404).send({errorMessage: 'Unable to find and update note.'}) :
+    res.send({message: 'Updated todo', todo});
+  }).catch((err) => {
+    res.status(404).send(err);
+  });
+});
+
 app.listen(port, () => {
   console.log(`Server started on ${port}.`);
 });

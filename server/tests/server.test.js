@@ -134,3 +134,82 @@ describe('GET /todos/:id', () => {
       .end(done);
   });
 });
+
+describe('DELETE /todos/:id', () => {
+  it('should return the deleted note if fed a valid, matching ID', (done) => {
+    let id = todos[0]._id.toHexString();
+    request(app)
+      .delete(`/todos/${id}`)
+      .expect(200)
+      .expect((res) => {
+        expect(res.body).toBeA('object');
+        expect(res.body.message).toBe('Todo deleted');
+        //Checking for the truthiness of the deleted note text, a required field for ToDo.
+        expect(res.body.todo.text).toExist();
+        //Make sure it deleted the right one!
+        expect(res.body.todo._id).toBe(id);
+      })
+      .end((err, res) => {
+        if (err) return done(err);
+        ToDo.find().then((docs) => {
+          //Returns an array of objects.
+          expect(docs.length).toBe(1);
+          expect(todos).toNotInclude({_id: id});
+          done();
+        }).catch((err) =>{
+          done(err);
+        });
+      });
+  });
+
+// //An alternative for above.
+//   ToDo.findById(id).then((doc) => {
+//     //Returns an array of objects.
+//     expect(doc).toNotExist;
+//     done();
+//   })
+
+  it('should return no note and a 404 if fed valid, non-matching ID', (done) => {
+    let id = new ObjectId().toHexString();
+    request(app)
+      .delete(`/todos/${id}`)
+      .expect(404)
+      .expect((res) => {
+        //Shouldn't return any todos.
+        expect(res.body.todo).toNotExist();
+        expect(res.body.errorMessage).toBe('Unable to find todo by that ID.');
+      })
+      //Unnecessary I suppose; could just .end(done).
+      .end((err, res) => {
+        if (err) return done(err);
+        ToDo.find().then((docs) => {
+          //Array of docs inserted to DB before test case should be unchanged.
+          expect(docs.length).toBe(2);
+          done();
+        }).catch((err) => {
+          done(err);
+        });
+      });
+  });
+
+  it('should return no note and a 400 if fed invalid ID', (done) => {
+    request(app)
+      .delete('/todos/123')
+      .expect(400)
+      .expect((res) => {
+        expect(res.body.todo).toNotExist();
+        expect(res.body.errorMessage).toBe('Invalid ID.');
+      })
+      //Just like with last one, wanted to make sure DB unchanged.
+      .end((err, res) => {
+        if (err) return done(err);
+        ToDo.find().then((docs) => {
+          //Array of docs inserted to DB before test case should be unchanged.
+          expect(docs.length).toBe(2);
+          done();
+        }).catch((err) => {
+          done(err);
+        });
+      });
+  });
+})
