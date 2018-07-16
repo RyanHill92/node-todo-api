@@ -1,4 +1,4 @@
-//No need to set to a variable. We just want this code to run. 
+//No need to set to a variable. We just want this code to run.
 require('./config/config');
 
 const express = require('express');
@@ -109,6 +109,28 @@ app.patch('/todos/:id', (req, res) => {
     res.send({message: 'Updated todo', todo});
   }).catch((err) => {
     res.status(404).send(err);
+  });
+});
+
+app.post('/users', (req, res) => {
+  let newUser = new User({
+    email: req.body.email,
+    password: req.body.password
+  });
+
+//Will return the user doc.
+  newUser.save().then(() => {
+    //We use this return so we can chain the next then to the then before, not to the function call.
+    //In other words, we avoid complicated nesting.
+    //This function returns a Promise, so here we return that Promise in the main chain.
+    return newUser.generateAuthToken();
+  }).then((token) => {
+    //Since the user is here sent as JSON, our overridden toJSON method kicks in.
+    res.header('x-auth', token).send({message: 'New user saved.', user: newUser});
+  }).catch((err)=>{
+    //Had to change to double equals since 11000 technically a string.
+    err.code == 11000 ? res.status(400).send({errorMessage: 'A profile with this email address already exists.'}) :
+    res.status(400).send({errorMessage: err.message});
   });
 });
 
