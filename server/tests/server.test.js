@@ -5,35 +5,12 @@ const {ObjectId} = require('mongodb');
 //.. means "back one folder in the directory."
 const {app} = require('./../server');
 const {ToDo} = require('./../models/todo');
+const {User} = require('./../models/user');
+const {populateTodos, todos, populateUsers, users} = require('./seed/seed');
 //Mocha and nodemon don't need to be required.
 
-//Our dummy array.
-//Add ObjectIDs for GET /todos/:id req test to work.
-const todos = [
-  {
-    _id: new ObjectId(),
-    text: 'Check one'
-  }, {
-    _id: new ObjectId(),
-    text: 'Check two',
-    completed: true,
-    completedAt: new Date().getTime()
-  }
-];
-
-beforeEach((done) => {
-  //This 'lifecycle' method will run before each test case.
-  //We clear the database before each test to ensure length = 1.
-  //Passing an empty object will remove all todos.
-  //Runs before EACH it().
-  //Inserting a dummy array of notes each time ensures the GET test will work.
-  ToDo.remove({}).then(() => {
-    //Return so we can chain a then.
-    return ToDo.insertMany(todos);
-  }).then(() => {
-    done();
-  });
-});
+beforeEach(populateUsers);
+beforeEach(populateTodos);
 
 describe('POST /todos', () => {
 //Remember, must specify 'done' for async testing.
@@ -338,3 +315,91 @@ describe('PATCH /todos/:id', () => {
       });
   });
 });
+
+describe('GET /users/me', () => {
+  it('should return a user object if authenticated', (done) => {
+    request(app)
+      .get('/users/me')
+      .set('x-auth', users[0].tokens[0].token)
+      .expect(200)
+      .expect((res) => {
+        expect(res.body._id).toBe(users[0]._id.toHexString());
+        expect(res.body.email).toBe(users[0].email);
+      })
+      .end(done);
+  });
+
+  it('should return a 401 with error message if no authentication', (done) => {
+    request(app)
+      .get('/users/me')
+      .expect(401)
+      .expect((res) => {
+        expect(res.body.errorMessage).toBe('Authentication required.');
+      })
+      .end(done);
+  });
+});
+
+describe('POST /users', () => {
+  it('should create a new user', (done) => {
+    let email = 'sarah@example.com';
+    let password = 'veryStrongPassword';
+    request(app)
+      .post('/users')
+      .send({
+        email,
+        password
+      })
+      .expect(200)
+      .expect((res) => {
+        expect(res.headers['x-auth']).toExist();
+        expect(res.body.user._id).toExist();
+        expect(res.body.user.email).toBe('sarah@example.com');
+      })
+      //I suppose he didn't have us test the DB at first because the only way for the
+      //above assertions to be true is for the save() Promises to have resolved.
+      //Also, note here that only one arg is passed to end(). No need for res as before.
+      .end((err) => {
+        if (err) return done(err);
+        User.findOne({email}).then((user) => {
+          //Make sure SOMEONE comes back.
+          expect(user).toExist();
+          //Make sure password has been hashed.
+          expect(user.password).toNotBe(password);
+          done();
+        });
+      });
+  });
+
+  it('should send back an error if email or password invalid', (done) => {
+    let badEmail = 'elephantears.com';
+    let badPassword = '12345';
+    request(app)
+      .post('/users')
+      .send({
+        email: 'christopher123@gmail.com',
+        password: badPassword
+      })
+      .expect(400)
+      .expect((res) => {
+        expect(res.body.user).toNotExist();
+        expect(res.body.errorMessage).toExist();
+      })
+      .end(done);
+  });
+
+  it('should send back an error if email already exists in database', (done) => {
+    request(app)
+      .post('/users')
+      .send({
+        email: users[0].email,
+        password: 'llama123'
+      })
+      .expect(400)
+      .expect((res) => {
+        expect(res.body.errorMessage).toBe('A profile with this email address already exists.');
+        expect(res.body.user).toNotExist();
+      })
+      .end(done);
+  });
+})

@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const validator = require('validator');
-const jwt = require('jsonwebtoken')
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 
 const UserSchema = new mongoose.Schema({
   email: {
@@ -82,6 +83,27 @@ UserSchema.statics.findByToken = function (token) {
     'tokens.access': 'auth'
   });
 };
+
+//For the longest time this wasn't working unless I typed let user = this then proceeded.
+//It has something to do with function declarations vs. arrow syntax.
+//Arrow syntax means the this retains the value of its enclosing lexical content.
+//Which makes since for the bcrypt block.
+//But if I use arrow syntax with pre(), it doesn't work.
+//That's because in that case, this is simply the global object ('window').
+UserSchema.pre('save', function (next) {
+  if (this.isModified('password')) {
+    bcrypt.genSalt(10, (err, salt) => {
+      bcrypt.hash(this.password, salt, (err, hash) => {
+        //Must be next within this block since it's async.
+        //Otherwise, next will run before the hash is set.
+        this.password = hash;
+        next();
+      });
+    });
+  } else {
+    next();
+  }
+});
 
 //This file holds our User model.
 const User = mongoose.model('User', UserSchema);
