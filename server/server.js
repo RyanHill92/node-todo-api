@@ -10,6 +10,7 @@ const {ObjectId} = require('mongodb');
 const mongoose = require('./db/mongoose');
 const {User} = require('./models/user');
 const {ToDo} = require('./models/todo');
+const {authenticate} = require('./middleware/authenticate');
 
 //This file will only be used to configure routes.
 const app = express();
@@ -132,6 +133,12 @@ app.post('/users', (req, res) => {
     err.code == 11000 ? res.status(400).send({errorMessage: 'A profile with this email address already exists.'}) :
     res.status(400).send({errorMessage: err.message});
   });
+});
+
+//First private route, thanks to authenticate. 
+app.get('/users/me', authenticate, (req, res) => {
+  //Thanks to the middleware, our req has been modified.
+  res.send(req.user);
 });
 
 app.listen(port, () => {

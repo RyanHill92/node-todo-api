@@ -42,7 +42,7 @@ UserSchema.methods.toJSON = function () {
     email: userObject.email,
     _id: userObject._id
   };
-}
+};
 
 //Adding an instance method.
 UserSchema.methods.generateAuthToken = function () {
@@ -57,7 +57,31 @@ UserSchema.methods.generateAuthToken = function () {
   return this.save().then(() => {
     return token;
   });
-}
+};
+
+//Adding a static method.
+UserSchema.statics.findByToken = function (token) {
+  let decoded;
+  try {
+    //jwt.verify will thrown an error if not valid which the catch block will process.
+    decoded = jwt.verify(token, 'abc123');
+  } catch (e) {
+    //Ensures that this function will return a rejected Promise, not a fulfilled one as below.
+    //A simpler way to write this is return Promise.reject();.
+    return new Promise((resolve, reject) => (
+      reject('Invalid authentication.')
+    ));
+  }
+  //Returning what should be a fulfilled Promise.
+  return this.findOne({
+    //Remember, the payload (and thus the decoded version too) contains the user _id.
+    '_id': decoded._id,
+    //The '' marks are necessary for using dot notation in key name to query a nested value.
+    //OK syntax for Mongoose even though nested in an array.
+    'tokens.token': token,
+    'tokens.access': 'auth'
+  });
+};
 
 //This file holds our User model.
 const User = mongoose.model('User', UserSchema);
