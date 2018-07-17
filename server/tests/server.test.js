@@ -16,10 +16,12 @@ describe('POST /todos', () => {
 //Remember, must specify 'done' for async testing.
   it('should create a new todo', (done) => {
     let text = 'Test todo text';
+    let _creator = users[0]._id;
 //Supertest begins here with 'request.'
     request(app)
       .post('/todos')
-      .send({text})
+      .set('x-auth', users[0].tokens[0].token)
+      .send({text, _creator})
       .expect(200)
       //Have to pass in res as arg for expect() to work.
       .expect((res) => {
@@ -49,6 +51,7 @@ describe('POST /todos', () => {
   it('should not store a note for bad request', (done) => {
     request(app)
       .post('/todos')
+      .set('x-auth', users[0].tokens[0].token)
       .send({})
       .expect(400)
       .end((err, res) => {
@@ -66,11 +69,11 @@ describe('GET /todos', () => {
   it('should return an object of all todos', (done) => {
     request(app)
       .get('/todos')
+      .set('x-auth', users[0].tokens[0].token)
       .expect(200)
       .expect((res) => {
         //These weren't working until I downgraded expect to v. 1.20.2 from v.21...
-        expect(res.body.todos.length).toBe(2);
-        expect(res.body.msg).toBe('Notes successfully retrieved');
+        expect(res.body.todos.length).toBe(1);
         expect(res.body.todos[0]).toInclude({text: 'Check one'});
         expect(res.body.todos).toBeA('array');
       })
@@ -82,13 +85,16 @@ describe('GET /todos/:id', () => {
   it('should return an object in case of valid, matching ID', (done) => {
     //So the ID is converted to a string, appendable to the URL.
     let id = todos[0]._id.toHexString();
+    let _creator = todos[0]._creator;
     request(app)
     //I kept getting an error because I left the : in there. Stupid!
       .get(`/todos/${id}`)
+      .set('x-auth', users[0].tokens[0].token)
       .expect(200)
       .expect((res) => {
-        expect(res.body.todo._id).toBe(id)
-        expect(res.body.message).toBe('Todo located')
+        expect(res.body.todo._id).toBe(id);
+        expect(res.body.message).toBe('Todo located.');
+        expect(res.body.todo._creator).toBe(_creator.toHexString());
       })
       .end(done);
   });
@@ -96,6 +102,7 @@ describe('GET /todos/:id', () => {
   it('should return a 400 in case of invalid ID format', (done) => {
     request(app)
       .get('/todos/123')
+      .set('x-auth', users[0].tokens[0].token)
       .expect(400)
       .expect((res) => {
         expect(res.body.errorMessage).toBe('Invalid ID.');
@@ -106,10 +113,20 @@ describe('GET /todos/:id', () => {
   it('should return a 404 in case of valid ID with no matching todo', (done) => {
     request(app)
       .get(`/todos/${new ObjectId().toHexString()}`)
+      .set('x-auth', users[0].tokens[0].token)
       .expect(404)
       .expect((res) => {
-        expect(res.body.errorMessage).toBe('Unable to find todo by that ID.');
+        expect(res.body.errorMessage).toBe('Unable to find todo by that ID belonging to current user.');
       })
+      .end(done);
+  });
+
+  it('should return a 404 in case of valid ID with matching todo but belonging to different creator', (done) => {
+    let id = todos[0]._id.toHexString();
+    request(app)
+      .get(`/todos/${id}`)
+      .set('x-auth', users[1].tokens[0].token)
+      .expect(404)
       .end(done);
   });
 });
@@ -119,10 +136,11 @@ describe('DELETE /todos/:id', () => {
     let id = todos[0]._id.toHexString();
     request(app)
       .delete(`/todos/${id}`)
+      .set('x-auth', users[0].tokens[0].token)
       .expect(200)
       .expect((res) => {
         expect(res.body).toBeA('object');
-        expect(res.body.message).toBe('Todo deleted');
+        expect(res.body.message).toBe('Todo deleted.');
         //Checking for the truthiness of the deleted note text, a required field for ToDo.
         expect(res.body.todo.text).toExist();
         //Make sure it deleted the right one!
@@ -152,11 +170,12 @@ describe('DELETE /todos/:id', () => {
     let id = new ObjectId().toHexString();
     request(app)
       .delete(`/todos/${id}`)
+      .set('x-auth', users[0].tokens[0].token)
       .expect(404)
       .expect((res) => {
         //Shouldn't return any todos.
         expect(res.body.todo).toNotExist();
-        expect(res.body.errorMessage).toBe('Unable to find todo by that ID.');
+        expect(res.body.errorMessage).toBe('Unable to find todo by that ID belonging to current user.');
       })
       //Unnecessary I suppose; could just .end(done).
       .end((err, res) => {
@@ -174,12 +193,31 @@ describe('DELETE /todos/:id', () => {
   it('should return no note and a 400 if fed invalid ID', (done) => {
     request(app)
       .delete('/todos/123')
+      .set('x-auth', users[0].tokens[0].token)
       .expect(400)
       .expect((res) => {
         expect(res.body.todo).toNotExist();
         expect(res.body.errorMessage).toBe('Invalid ID.');
       })
       //Just like with last one, wanted to make sure DB unchanged.
+      .end((err, res) => {
+        if (err) return done(err);
+        ToDo.find().then((docs) => {
+          //Array of docs inserted to DB before test case should be unchanged.
+          expect(docs.length).toBe(2);
+          done();
+        }).catch((err) => {
+          done(err);
+        });
+      });
+  });
+
+  it('should block one user from deleting another user\'s todo', (done) => {
+    let id = todos[0]._id.toHexString();
+    request(app)
+      .delete(`/todos/${id}`)
+      .set('x-auth', users[1].tokens[0].token)
+      .expect(404)
       .end((err, res) => {
         if (err) return done(err);
         ToDo.find().then((docs) => {
@@ -199,13 +237,14 @@ describe('PATCH /todos/:id', () => {
     let text = 'Check one, son';
     request(app)
       .patch(`/todos/${id}`)
+      .set('x-auth', users[0].tokens[0].token)
       .send({
         text,
         completed: true
       })
       .expect(200)
       .expect((res) => {
-        expect(res.body.message).toBe('Updated todo');
+        expect(res.body.message).toBe('Updated todo.');
       })
       .end((err, res) => {
         if (err) return done(err);
@@ -225,13 +264,14 @@ describe('PATCH /todos/:id', () => {
     let text = 'Check two, foo';
     request(app)
       .patch(`/todos/${id}`)
+      .set('x-auth', users[1].tokens[0].token)
       .send({
         text,
         completed: false
       })
       .expect(200)
       .expect((res) => {
-        expect(res.body.message).toBe('Updated todo');
+        expect(res.body.message).toBe('Updated todo.');
       })
       .end((err, res) => {
         if (err) return done(err);
@@ -246,11 +286,25 @@ describe('PATCH /todos/:id', () => {
       });
   });
 
+  it('should not allow one user to update another user\'s todo', (done) => {
+    let id = todos[0]._id.toHexString();
+    request(app)
+      .patch(`/todos/${id}`)
+      .set('x-auth', users[1].tokens[0].token)
+      .send({
+        text: 'Check one, son.',
+        completed: true
+      })
+      .expect(404)
+      .end(done);
+  });
+
   it('should reject a request body either blank or containing invalid data even in case of valid, matching ID', (done) => {
     let id = todos[0]._id.toHexString();
     //This wasn't working for 20min...because I had app(request). Stoo. Pid.
     request(app)
       .patch(`/todos/${id}`)
+      .set('x-auth', users[0].tokens[0].token)
       .send({
         text: '   ',
         completed: 'Yes'
@@ -261,8 +315,9 @@ describe('PATCH /todos/:id', () => {
       })
       .end((err, res) => {
         if (err) return done(err);
-        ToDo.find().then((docs) => {
-          expect(docs.length).toBe(2);
+        ToDo.findById(id).then((doc) => {
+          expect(doc.text.length).toBeGreaterThan(0);
+          expect(doc.completed).toBe(false);
           done();
         }).catch((err) => {
           done(err);
@@ -273,6 +328,7 @@ describe('PATCH /todos/:id', () => {
   it('should send a 400 for an invalid ID', (done) => {
     request(app)
       .patch('/todos/123')
+      .set('x-auth', users[0].tokens[0].token)
       .send({
         text: 'Test',
         completed: false
@@ -281,38 +337,23 @@ describe('PATCH /todos/:id', () => {
       .expect((res) => {
         expect(res.body.errorMessage).toBe('Invalid ID.')
       })
-      .end((err, res) => {
-        if (err) return done(err);
-        ToDo.find().then((docs) => {
-          expect(docs.length).toBe(2);
-          done();
-        }).catch((err) => {
-          done(err);
-        });
-      });
+      .end(done);
   });
 
   it('should send a 404 for a valid, unmatching ID', (done) => {
     let id = new ObjectId().toHexString();
     request(app)
       .patch(`/todos/${id}`)
+      .set('x-auth', users[0].tokens[0].token)
       .send({
         text: 'Hi there',
         completed: false
       })
       .expect(404)
       .expect((res) => {
-        expect(res.body.errorMessage).toBe('Unable to find and update note.');
+        expect(res.body.errorMessage).toBe('Unable to find and update note belonging to current user.');
       })
-      .end((err, res) => {
-        if (err) return done(err);
-        ToDo.find().then((docs) => {
-          expect(todos.length).toBe(2);
-          done();
-        }).catch((err) => {
-          done(err);
-        });
-      });
+      .end(done);
   });
 });
 
@@ -406,21 +447,6 @@ describe('POST /users', () => {
 
 describe('POST /users/login', () => {
   it('should return a user and token for valid email and password', (done) => {
-    let email = 'ryan@example.com';
-    let password = 'strongPassword';
-    request(app)
-      .post('/users/login')
-      .send({email, password})
-      .expect(200)
-      .expect((res) => {
-        expect(res.headers['x-auth']).toExist();
-        expect(res.body.user).toExist();
-        expect(res.body.user.email).toBe(email);
-      })
-      .end(done);
-  });
-
-  it('should store a token for token-less seed user', (done) => {
     let email = users[1].email;
     let password = users[1].password;
     request(app)
@@ -435,7 +461,8 @@ describe('POST /users/login', () => {
       .end((err, res) => {
         if (err) return done(err);
         User.findOne({email}).then((user) => {
-          expect(user.tokens[0]).toInclude({
+          //Now has two tokens, thanks to log-in above.
+          expect(user.tokens[1]).toInclude({
             access: 'auth',
             token: res.headers['x-auth']
           });
@@ -445,6 +472,7 @@ describe('POST /users/login', () => {
         });
       });
   });
+
 
   it('should return a 400 for invalid login info', (done) => {
     let email = 'ryan@example.com';

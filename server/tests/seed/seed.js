@@ -3,15 +3,20 @@ const jwt = require('jsonwebtoken')
 const {ToDo} = require('./../../models/todo');
 const {User} = require('./../../models/user');
 
+let userOneId = new ObjectId();
+let userTwoId = new ObjectId();
+
 //Our dummy array.
 //Add ObjectIDs for GET /todos/:id req test to work.
 const todos = [
   {
     _id: new ObjectId(),
-    text: 'Check one'
+    text: 'Check one',
+    _creator: userOneId
   }, {
     _id: new ObjectId(),
     text: 'Check two',
+    _creator: userTwoId,
     completed: true,
     completedAt: new Date().getTime()
   }
@@ -31,20 +36,23 @@ const populateTodos = done => {
   });
 };
 
-let userOneId = new ObjectId();
-let userTwoId = new ObjectId();
+
 const users = [{
   email: 'ryan@example.com',
   password: 'strongPassword',
   _id: userOneId,
   tokens: [{
     access: 'auth',
-    token: jwt.sign({_id: userOneId.toHexString(), access: 'auth'}, 'abc123').toString()
+    token: jwt.sign({_id: userOneId.toHexString(), access: 'auth'}, process.env.jwt_secret).toString()
   }]
 }, {
   email: 'anna@example.com',
   password: 'strongerPassword',
-  _id: userTwoId
+  _id: userTwoId,
+  tokens: [{
+    access: 'auth',
+    token: jwt.sign({_id: userTwoId.toHexString(), access: 'auth'}, process.env.jwt_secret).toString()
+  }]
 }];
 
 //If we wrote this function with .insertMany(), then the passwords wouldn't get hashed.

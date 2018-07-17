@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-//This file holds our ToDo model. 
+//This file holds our ToDo model.
 const ToDo = mongoose.model('ToDo', {
   text: {
     type: String,
@@ -16,6 +16,10 @@ const ToDo = mongoose.model('ToDo', {
   completedAt: {
     type: Number,
     default: null
+  },
+  _creator: {
+    required: true,
+    type: mongoose.Schema.Types.ObjectId
   }
 });
 

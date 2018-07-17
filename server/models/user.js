@@ -48,7 +48,7 @@ UserSchema.methods.toJSON = function () {
 //Adding an instance method.
 UserSchema.methods.generateAuthToken = function () {
   let access = 'auth';
-  let token = jwt.sign({_id: this._id.toHexString(), access}, 'abc123').toString();
+  let token = jwt.sign({_id: this._id.toHexString(), access}, process.env.jwt_secret).toString();
   //I had .concat here on Andrew's advice, but push fixed my issue of the response body not having anything set to the newUser's tokens array.
   this.tokens.push({access, token});
   return this.save().then(() => {
@@ -77,7 +77,7 @@ UserSchema.statics.findByToken = function (token) {
   let decoded;
   try {
     //jwt.verify will thrown an error if not valid which the catch block will process.
-    decoded = jwt.verify(token, 'abc123');
+    decoded = jwt.verify(token, process.env.jwt_secret);
   } catch (e) {
     //Ensures that this function will return a rejected Promise, not a fulfilled one as below.
     //A simpler way to write this is return Promise.reject();.

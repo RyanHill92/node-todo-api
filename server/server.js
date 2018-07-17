@@ -21,9 +21,12 @@ app.use(bodyParser.json());
 
 //Here we set up a route for receiving incoming data from the client.
 //We'll take this data, push it to the DB, and return an object to the client.
-app.post('/todos', (req, res) => {
+app.post('/todos', authenticate, (req, res) => {
 //This will log the parsed JSON data from the client, thanks to bodyParser.
-  let toDo = new ToDo({text: req.body.text});
+  let toDo = new ToDo({
+    text: req.body.text,
+    _creator: req.user._id
+  });
   toDo.save().then((doc)=>{
     res.send(doc);
   }, (err)=>{
@@ -32,10 +35,12 @@ app.post('/todos', (req, res) => {
   });
 });
 
-app.get('/todos', (req, res) => {
-  ToDo.find().then((todos)=>{
+app.get('/todos', authenticate, (req, res) => {
+  ToDo.find({
+    _creator: req.user._id
+  }).then((todos)=>{
     //Wrap the array of objects in an object for future flexibility.
-    res.send({msg: 'Notes successfully retrieved', todos});
+    res.send({msg: `${todos.length} note(s) successfully retrieved.`, todos});
   }, (err)=> {
     res.status(400).send(err);
   });
@@ -47,30 +52,30 @@ app.get('/todos', (req, res) => {
 // });
 
 //Some cool experimentation here with ternary op. It works!
-app.get('/todos/:id', (req, res) => {
+app.get('/todos/:id', authenticate, (req, res) => {
   let id = req.params.id;
   !ObjectId.isValid(id) ? res.status(400).send({errorMessage: 'Invalid ID.'}) :
-  ToDo.findById(id).then((todo) => {
-    !todo ? res.status(404).send({errorMessage: 'Unable to find todo by that ID.'}) :
-    res.send({message: 'Todo located', todo});
+  ToDo.findOne({_id: id, _creator: req.user._id}).then((todo) => {
+    !todo ? res.status(404).send({errorMessage: 'Unable to find todo by that ID belonging to current user.'}) :
+    res.send({message: 'Todo located.', todo});
   }).catch((err)=> {
     res.status(404).send(err);
   });
 });
 
 //Add a DELETE / route.
-app.delete('/todos/:id', (req, res) => {
+app.delete('/todos/:id', authenticate, (req, res) => {
   let id = req.params.id;
   !ObjectId.isValid(id) ? res.status(400).send({errorMessage: 'Invalid ID.'}) :
-  ToDo.findByIdAndRemove(id).then((todo) => {
-    !todo ? res.status(404).send({errorMessage: 'Unable to find todo by that ID.'}) :
-    res.send({message: 'Todo deleted', todo});
+  ToDo.findOneAndRemove({_id: id, _creator: req.user._id}).then((todo) => {
+    !todo ? res.status(404).send({errorMessage: 'Unable to find todo by that ID belonging to current user.'}) :
+    res.send({message: 'Todo deleted.', todo});
   }).catch((err)=> {
     res.status(404).send(err);
   });
 });
 
-app.patch('/todos/:id', (req, res) => {
+app.patch('/todos/:id', authenticate, (req, res) => {
   let id = req.params.id;
 
   if (!ObjectId.isValid(id)) {
@@ -83,7 +88,7 @@ app.patch('/todos/:id', (req, res) => {
     if (typeof req.body.text === 'string' && req.body.text.trim().length >= 1) {
       body.text = req.body.text;
     }
-    //Completed prop only set if true or false.
+    //Completed prop only set if true or false thanks to triple equals.
     if (req.body.completed === true) {
       body.completed = true;
       body.completedAt = new Date().getTime();
@@ -100,14 +105,14 @@ app.patch('/todos/:id', (req, res) => {
     return res.status(400).send({errorMessage: 'Please specify text update (string) and/or valid completion status (boolean).'});
   }
 
-  ToDo.findByIdAndUpdate(id, {
+  ToDo.findOneAndUpdate({_id: id, _creator: req.user._id}, {
     //Should work since body is an obj.
     $set: body
   }, {
     new: true
   }).then((todo) => {
-    !todo ? res.status(404).send({errorMessage: 'Unable to find and update note.'}) :
-    res.send({message: 'Updated todo', todo});
+    !todo ? res.status(404).send({errorMessage: 'Unable to find and update note belonging to current user.'}) :
+    res.send({message: 'Updated todo.', todo});
   }).catch((err) => {
     res.status(404).send(err);
   });
