@@ -402,4 +402,78 @@ describe('POST /users', () => {
       })
       .end(done);
   });
-})
+});
+
+describe('POST /users/login', () => {
+  it('should return a user and token for valid email and password', (done) => {
+    let email = 'ryan@example.com';
+    let password = 'strongPassword';
+    request(app)
+      .post('/users/login')
+      .send({email, password})
+      .expect(200)
+      .expect((res) => {
+        expect(res.headers['x-auth']).toExist();
+        expect(res.body.user).toExist();
+        expect(res.body.user.email).toBe(email);
+      })
+      .end(done);
+  });
+
+  it('should store a token for token-less seed user', (done) => {
+    let email = users[1].email;
+    let password = users[1].password;
+    request(app)
+      .post('/users/login')
+      .send({email, password})
+      .expect(200)
+      .expect((res) => {
+        expect(res.headers['x-auth']).toExist();
+        expect(res.body.user).toExist();
+        expect(res.body.user.email).toBe(email);
+      })
+      .end((err, res) => {
+        if (err) return done(err);
+        User.findOne({email}).then((user) => {
+          expect(user.tokens[0]).toInclude({
+            access: 'auth',
+            token: res.headers['x-auth']
+          });
+          done();
+        }).catch((err) => {
+          done(err);
+        });
+      });
+  });
+
+  it('should return a 400 for invalid login info', (done) => {
+    let email = 'ryan@example.com';
+    let password = 'strongPassword';
+    request(app)
+      .post('/users/login')
+      .send({email, password: 'nitrogen'})
+      .expect(400)
+      .expect((res) => {
+        expect(res.headers['x-auth']).toNotExist();
+        expect(res.body.errorMessage).toExist();
+      })
+      .end(done);
+  });
+});
+
+describe('DELETE /users/me/token', () => {
+  it('should remove auth token on log out', (done) => {
+    let token = users[0].tokens[0].token;
+    request(app)
+      .delete('/users/me/token')
+      .set('x-auth', token)
+      .expect(200)
+      .end((err) => {
+        if (err) done(err);
+        User.findById(users[0]._id.toHexString()).then((user) => {
+          expect(user.tokens.length).toBe(0);
+          done();
+        }).catch((err) => done(err));
+      });
+  });
+});

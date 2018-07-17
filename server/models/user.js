@@ -51,12 +51,24 @@ UserSchema.methods.generateAuthToken = function () {
   let token = jwt.sign({_id: this._id.toHexString(), access}, 'abc123').toString();
   //I had .concat here on Andrew's advice, but push fixed my issue of the response body not having anything set to the newUser's tokens array.
   this.tokens.push({access, token});
+  return this.save().then(() => {
+    return token;
+  });
+};
   //Add returns here so we can chain thens on both ends of this method call in server.js.
   //The first return ensures that this method returns a promise.
   //The second return ensures that this promise, once resolved, will pass on a value.
   //This value will continue down the chain to the next .then().
-  return this.save().then(() => {
-    return token;
+
+UserSchema.methods.removeToken = function (token) {
+  //Makes this method chainable with Promises.
+  return this.update({
+    //Any object with a token property equal to token will get pulled from the array.
+    $pull: {
+      tokens: {
+        token
+      }
+    }
   });
 };
 

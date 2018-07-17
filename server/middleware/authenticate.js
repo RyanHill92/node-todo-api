@@ -9,7 +9,7 @@ const authenticate = function (req, res, next) {
   User.findByToken(token).then((user) => {
     //Tried ternary op here but logged as unhandled Promise rejection.
     if (!user) {
-      return Promise.reject('User does not exist.');
+      return Promise.reject('No user with that token exists.');
     }
     //User, thanks to our overridden toJSON method, contains just email and _id.
     req.user = user;

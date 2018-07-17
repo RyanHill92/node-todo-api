@@ -127,7 +127,7 @@ app.post('/users', (req, res) => {
     return newUser.generateAuthToken();
   }).then((token) => {
     //Since the user is here sent as JSON, our overridden toJSON method kicks in.
-    res.header('x-auth', token).send({message: 'New user saved.', user: newUser});
+    res.header('x-auth', token).send({message: 'Account created. New user logged in.', user: newUser});
   }).catch((err)=>{
     //Had to change to double equals since 11000 technically a string.
     err.code == 11000 ? res.status(400).send({errorMessage: 'A profile with this email address already exists.'}) :
@@ -154,6 +154,15 @@ app.post('/users/login', (req, res) => {
     });
   }).catch((err) => {
     res.status(400).send({errorMessage: err});
+  });
+});
+
+app.delete('/users/me/token', authenticate, (req, res) => {
+  //These two properties of the req body are set by authenticate.
+  req.user.removeToken(req.token).then(() => {
+    res.status(200).send({message: 'User logged out.'});
+  }, () => {
+    res.status(400).send({errorMessage: 'Log out failed.'});
   });
 });
 
