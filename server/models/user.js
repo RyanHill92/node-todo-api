@@ -84,6 +84,25 @@ UserSchema.statics.findByToken = function (token) {
   });
 };
 
+//With this design, we ensure that this function is chainable.
+//It returns a Promise that returns another Promise, either resolved or rejected, whichever way it goes.
+UserSchema.statics.findByCredentials = function (email, password) {
+  return this.findOne({email}).then((user) => {
+    if (!user) {
+      return Promise.reject('No user with that email address exists.');
+    }
+    return new Promise((resolve, reject) => {
+      bcrypt.compare(password, user.password, (err, res) => {
+        if (res === true) {
+          resolve(user);
+        } else {
+          reject('Invalid password.');
+        }
+      });
+    });
+  });
+};
+
 //For the longest time this wasn't working unless I typed let user = this then proceeded.
 //It has something to do with function declarations vs. arrow syntax.
 //Arrow syntax means the this retains the value of its enclosing lexical content.

@@ -135,10 +135,26 @@ app.post('/users', (req, res) => {
   });
 });
 
-//First private route, thanks to authenticate. 
+//First private route, thanks to authenticate.
 app.get('/users/me', authenticate, (req, res) => {
   //Thanks to the middleware, our req has been modified.
   res.send(req.user);
+});
+
+//Log-in route. Receive email and password, return user.
+app.post('/users/login', (req, res) => {
+  let login = {
+    email: req.body.email,
+    password: req.body.password
+  };
+  User.findByCredentials(login.email, login.password).then((user) => {
+    //This return is key so that it fits into the chain without nesting a catch/then.
+    return user.generateAuthToken().then((token) => {
+      res.header('x-auth', token).send({message: 'Login successful.', user});
+    });
+  }).catch((err) => {
+    res.status(400).send({errorMessage: err});
+  });
 });
 
 app.listen(port, () => {
